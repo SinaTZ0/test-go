@@ -8,16 +8,23 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const testDatabaseURL = "postgres://user:password@localhost:5432/go-todo"
 
 func TestTodoAPI(t *testing.T) {
 	ctx := context.Background()
-	app := newTestApp(t, ctx)
+	dsn := testDatabaseURL
+	if envDSN := os.Getenv("DATABASE_URL"); envDSN != "" {
+		dsn = envDSN
+	}
+
+	app := newTestApp(t, ctx, dsn)
 	defer app.Close()
 
-	resetTodos(t, ctx, app)
+	resetTodos(t, ctx, dsn)
 
 	t.Run("health", func(t *testing.T) {
 		rec := httptest.NewRecorder()
@@ -31,7 +38,7 @@ func TestTodoAPI(t *testing.T) {
 	})
 
 	t.Run("crud lifecycle", func(t *testing.T) {
-		resetTodos(t, ctx, app)
+		resetTodos(t, ctx, dsn)
 
 		created := createTodo(t, app, `{"title":"Write tests","completed":false}`)
 		if created.ID == 0 {
@@ -98,7 +105,7 @@ func TestTodoAPI(t *testing.T) {
 	})
 
 	t.Run("validation", func(t *testing.T) {
-		resetTodos(t, ctx, app)
+		resetTodos(t, ctx, dsn)
 
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/todos", bytes.NewBufferString(`{"title":""}`))
@@ -111,13 +118,8 @@ func TestTodoAPI(t *testing.T) {
 	})
 }
 
-func newTestApp(t *testing.T, ctx context.Context) *App {
+func newTestApp(t *testing.T, ctx context.Context, dsn string) *App {
 	t.Helper()
-
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = testDatabaseURL
-	}
 
 	app, err := NewApp(ctx, dsn)
 	if err != nil {
@@ -127,10 +129,16 @@ func newTestApp(t *testing.T, ctx context.Context) *App {
 	return app
 }
 
-func resetTodos(t *testing.T, ctx context.Context, app *App) {
+func resetTodos(t *testing.T, ctx context.Context, dsn string) {
 	t.Helper()
 
-	if _, err := app.store.pool.Exec(ctx, `TRUNCATE TABLE todos RESTART IDENTITY`); err != nil {
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect postgres: %v", err)
+	}
+	defer pool.Close()
+
+	if _, err := pool.Exec(ctx, `TRUNCATE TABLE todos RESTART IDENTITY`); err != nil {
 		t.Fatalf("reset todos: %v", err)
 	}
 }
