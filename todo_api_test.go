@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,15 +17,19 @@ const testDatabaseURL = "postgres://user:password@localhost:5432/go-todo"
 
 func TestTodoAPI(t *testing.T) {
 	ctx := context.Background()
-	dsn := testDatabaseURL
-	if envDSN := os.Getenv("DATABASE_URL"); envDSN != "" {
-		dsn = envDSN
+	databaseURL := testDatabaseURL
+	if envDatabaseURL := os.Getenv("DATABASE_URL"); envDatabaseURL != "" {
+		databaseURL = envDatabaseURL
 	}
 
-	app := newTestApp(t, ctx, dsn)
-	defer app.Close()
+	app := newTestApp(t, ctx, databaseURL)
+	defer func() {
+		if err := app.Close(); err != nil {
+			log.Printf("failed to close app: %v", err)
+		}
+	}()
 
-	resetTodos(t, ctx, dsn)
+	resetTodos(t, ctx, databaseURL)
 
 	t.Run("health", func(t *testing.T) {
 		rec := httptest.NewRecorder()
@@ -38,7 +43,7 @@ func TestTodoAPI(t *testing.T) {
 	})
 
 	t.Run("crud lifecycle", func(t *testing.T) {
-		resetTodos(t, ctx, dsn)
+		resetTodos(t, ctx, databaseURL)
 
 		created := createTodo(t, app, `{"title":"Write tests","completed":false}`)
 		if created.ID == 0 {
@@ -105,7 +110,7 @@ func TestTodoAPI(t *testing.T) {
 	})
 
 	t.Run("validation", func(t *testing.T) {
-		resetTodos(t, ctx, dsn)
+		resetTodos(t, ctx, databaseURL)
 
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/todos", bytes.NewBufferString(`{"title":""}`))
@@ -118,10 +123,10 @@ func TestTodoAPI(t *testing.T) {
 	})
 }
 
-func newTestApp(t *testing.T, ctx context.Context, dsn string) *App {
+func newTestApp(t *testing.T, ctx context.Context, databaseURL string) *App {
 	t.Helper()
 
-	app, err := NewApp(ctx, dsn)
+	app, err := NewApp(ctx, databaseURL)
 	if err != nil {
 		t.Fatalf("new app: %v", err)
 	}
@@ -129,10 +134,10 @@ func newTestApp(t *testing.T, ctx context.Context, dsn string) *App {
 	return app
 }
 
-func resetTodos(t *testing.T, ctx context.Context, dsn string) {
+func resetTodos(t *testing.T, ctx context.Context, databaseURL string) {
 	t.Helper()
 
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
 		t.Fatalf("connect postgres: %v", err)
 	}

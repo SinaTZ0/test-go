@@ -22,13 +22,13 @@ type TodoStore = todoapp.Store
 type App = todoapp.App
 
 // NewTodoStore opens a todo store backed by the supplied Postgres connection string.
-func NewTodoStore(ctx context.Context, dsn string) (*TodoStore, error) {
-	return todoapp.NewStore(ctx, dsn)
+func NewTodoStore(ctx context.Context, databaseURL string) (*TodoStore, error) {
+	return todoapp.NewStore(ctx, databaseURL)
 }
 
 // NewApp opens a todo store and returns a ready-to-serve HTTP application.
-func NewApp(ctx context.Context, dsn string) (*App, error) {
-	store, err := todoapp.NewStore(ctx, dsn)
+func NewApp(ctx context.Context, databaseURL string) (*App, error) {
+	store, err := todoapp.NewStore(ctx, databaseURL)
 	if err != nil {
 		return nil, err
 	}

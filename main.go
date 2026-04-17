@@ -10,12 +10,12 @@ import (
 const defaultDatabaseURL = "postgres://user:password@localhost:5432/go-todo"
 
 func main() {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = defaultDatabaseURL
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = defaultDatabaseURL
 	}
 
-	app, err := NewApp(context.Background(), dsn)
+	app, err := NewApp(context.Background(), databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}

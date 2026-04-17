@@ -7,38 +7,28 @@ import (
 	"log"
 	"os"
 
+	todoapp "github.com/SinaTZ0/test-go/internal/todo"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const migrateSchema = `
-CREATE TABLE IF NOT EXISTS todos (
-	id BIGSERIAL PRIMARY KEY,
-	title TEXT NOT NULL,
-	description TEXT NOT NULL DEFAULT '',
-	completed BOOLEAN NOT NULL DEFAULT FALSE,
-	created_at TIMESTAMPTZ NOT NULL,
-	updated_at TIMESTAMPTZ NOT NULL
-)
-`
-
 func main() {
-	var dsn string
-	flag.StringVar(&dsn, "dsn", os.Getenv("DATABASE_URL"), "Postgres connection string")
+	var databaseURL string
+	flag.StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "Postgres connection string")
 	flag.Parse()
 
-	if dsn == "" {
-		dsn = "postgres://user:password@localhost:5432/go-todo"
+	if databaseURL == "" {
+		databaseURL = "postgres://user:password@localhost:5432/go-todo"
 	}
 
-	if err := runMigration(context.Background(), dsn); err != nil {
+	if err := runMigration(context.Background(), databaseURL); err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Println("migration complete")
 }
 
-func runMigration(ctx context.Context, dsn string) error {
-	pool, err := pgxpool.New(ctx, dsn)
+func runMigration(ctx context.Context, databaseURL string) error {
+	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
 		return fmt.Errorf("connect postgres: %w", err)
 	}
@@ -48,7 +38,12 @@ func runMigration(ctx context.Context, dsn string) error {
 		return fmt.Errorf("ping postgres: %w", err)
 	}
 
-	if _, err := pool.Exec(ctx, migrateSchema); err != nil {
+	schema, err := todoapp.LoadSchemaSQL()
+	if err != nil {
+		return fmt.Errorf("load schema: %w", err)
+	}
+
+	if _, err := pool.Exec(ctx, string(schema)); err != nil {
 		return fmt.Errorf("apply migration: %w", err)
 	}
 

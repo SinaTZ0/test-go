@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -196,7 +197,11 @@ func (a *App) handleDeleteTodo(w http.ResponseWriter, r *http.Request) {
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
 	body := http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
-	defer body.Close()
+	defer func() {
+		if err := body.Close(); err != nil {
+			log.Printf("failed to close request body: %v", err)
+		}
+	}()
 
 	decoder := json.NewDecoder(body)
 	decoder.DisallowUnknownFields()
