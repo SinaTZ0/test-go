@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	// "github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTodo = `-- name: CreateTodo :one
@@ -28,9 +27,9 @@ RETURNING id, title, description, completed, created_at, updated_at
 `
 
 type CreateTodoParams struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Completed   bool   `json:"completed"`
+	Title       string  `json:"title"`
+	Description *string `json:"description"`
+	Completed   bool    `json:"completed"`
 }
 
 func (q *Queries) CreateTodo(ctx context.Context, arg CreateTodoParams) (Todo, error) {
@@ -125,10 +124,10 @@ RETURNING id, title, description, completed, created_at, updated_at
 `
 
 type ReplaceTodoParams struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Completed   bool   `json:"completed"`
-	ID          int64  `json:"id"`
+	Title       string  `json:"title"`
+	Description *string `json:"description"`
+	Completed   bool    `json:"completed"`
+	ID          int64   `json:"id"`
 }
 
 func (q *Queries) ReplaceTodo(ctx context.Context, arg ReplaceTodoParams) (Todo, error) {
@@ -150,28 +149,29 @@ func (q *Queries) ReplaceTodo(ctx context.Context, arg ReplaceTodoParams) (Todo,
 	return i, err
 }
 
-// Red
 const updateTodo = `-- name: UpdateTodo :one
 UPDATE todos
 SET
 	title = COALESCE($1, title),
-	description = COALESCE($2, description),
-	completed = COALESCE($3, completed),
+	description = CASE WHEN $2::bool THEN $3 ELSE description END,
+	completed = COALESCE($4, completed),
 	updated_at = NOW()
-WHERE id = $4
+WHERE id = $5
 RETURNING id, title, description, completed, created_at, updated_at
 `
 
 type UpdateTodoParams struct {
-	Title       *string `json:"title"`
-	Description *string `json:"description"`
-	Completed   *bool   `json:"completed"`
-	ID          int64   `json:"id"`
+	Title          *string `json:"title"`
+	DescriptionSet bool    `json:"description_set"`
+	Description    *string `json:"description"`
+	Completed      *bool   `json:"completed"`
+	ID             int64   `json:"id"`
 }
 
 func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, error) {
 	row := q.db.QueryRow(ctx, updateTodo,
 		arg.Title,
+		arg.DescriptionSet,
 		arg.Description,
 		arg.Completed,
 		arg.ID,
@@ -187,41 +187,3 @@ func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, e
 	)
 	return i, err
 }
-
-// Blue
-// const updateTodo = `-- name: UpdateTodo :one
-// UPDATE todos
-// SET
-// 	title = COALESCE($1, title),
-// 	description = COALESCE($2, description),
-// 	completed = COALESCE($3, completed),
-// 	updated_at = NOW()
-// WHERE id = $4
-// RETURNING id, title, description, completed, created_at, updated_at
-// `
-
-// type UpdateTodoParams struct {
-// 	Title       pgtype.Text `json:"title"`
-// 	Description pgtype.Text `json:"description"`
-// 	Completed   pgtype.Bool `json:"completed"`
-// 	ID          int64       `json:"id"`
-// }
-
-// func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, error) {
-// 	row := q.db.QueryRow(ctx, updateTodo,
-// 		arg.Title,
-// 		arg.Description,
-// 		arg.Completed,
-// 		arg.ID,
-// 	)
-// 	var i Todo
-// 	err := row.Scan(
-// 		&i.ID,
-// 		&i.Title,
-// 		&i.Description,
-// 		&i.Completed,
-// 		&i.CreatedAt,
-// 		&i.UpdatedAt,
-// 	)
-// 	return i, err
-// }

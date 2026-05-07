@@ -49,6 +49,9 @@ func TestTodoAPI(t *testing.T) {
 		if created.ID == 0 {
 			t.Fatal("expected todo id to be set")
 		}
+		if created.Description != nil {
+			t.Fatalf("expected nil description for omitted create field, got %+v", created.Description)
+		}
 
 		listRec := httptest.NewRecorder()
 		listReq := httptest.NewRequest(http.MethodGet, "/todos", nil)
@@ -83,7 +86,7 @@ func TestTodoAPI(t *testing.T) {
 
 		var replaced Todo
 		decodeBody(t, replaceRec.Body.Bytes(), &replaced)
-		if replaced.Title != "Ship docs" || !replaced.Completed {
+		if replaced.Title != "Ship docs" || replaced.Description == nil || *replaced.Description != "Published version" || !replaced.Completed {
 			t.Fatalf("unexpected replaced todo: %+v", replaced)
 		}
 
@@ -97,8 +100,22 @@ func TestTodoAPI(t *testing.T) {
 
 		var updated Todo
 		decodeBody(t, updateRec.Body.Bytes(), &updated)
-		if updated.Title != "Ship docs v2" || updated.Description != "Published and verified" || updated.Completed {
+		if updated.Title != "Ship docs v2" || updated.Description == nil || *updated.Description != "Published and verified" || updated.Completed {
 			t.Fatalf("unexpected patched todo: %+v", updated)
+		}
+
+		nullUpdateRec := httptest.NewRecorder()
+		nullUpdateReq := httptest.NewRequest(http.MethodPatch, "/todos/1", bytes.NewBufferString(`{"description":null}`))
+		nullUpdateReq.Header.Set("Content-Type", "application/json")
+		app.ServeHTTP(nullUpdateRec, nullUpdateReq)
+		if nullUpdateRec.Code != http.StatusOK {
+			t.Fatalf("patch null status = %d, want %d", nullUpdateRec.Code, http.StatusOK)
+		}
+
+		var nulled Todo
+		decodeBody(t, nullUpdateRec.Body.Bytes(), &nulled)
+		if nulled.Description != nil {
+			t.Fatalf("expected nil description after null patch, got %+v", nulled)
 		}
 
 		deleteRec := httptest.NewRecorder()
@@ -106,6 +123,15 @@ func TestTodoAPI(t *testing.T) {
 		app.ServeHTTP(deleteRec, deleteReq)
 		if deleteRec.Code != http.StatusNoContent {
 			t.Fatalf("delete status = %d, want %d", deleteRec.Code, http.StatusNoContent)
+		}
+	})
+
+	t.Run("create accepts null description", func(t *testing.T) {
+		resetTodos(t, ctx, databaseURL)
+
+		created := createTodo(t, app, `{"title":"Learn nulls","description":null,"completed":false}`)
+		if created.Description != nil {
+			t.Fatalf("expected nil description, got %+v", created.Description)
 		}
 	})
 

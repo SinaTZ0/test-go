@@ -75,7 +75,7 @@ func (s *Store) List(ctx context.Context) ([]Todo, error) {
 func (s *Store) Create(ctx context.Context, req CreateTodoRequest) (Todo, error) {
 	record, err := s.queries.CreateTodo(ctx, db.CreateTodoParams{
 		Title:       strings.TrimSpace(req.Title),
-		Description: strings.TrimSpace(req.Description),
+		Description: trimNullableString(req.Description),
 		Completed:   req.Completed,
 	})
 	if err != nil {
@@ -90,7 +90,7 @@ func (s *Store) Replace(ctx context.Context, id int64, req CreateTodoRequest) (T
 	record, err := s.queries.ReplaceTodo(ctx, db.ReplaceTodoParams{
 		ID:          id,
 		Title:       strings.TrimSpace(req.Title),
-		Description: strings.TrimSpace(req.Description),
+		Description: trimNullableString(req.Description),
 		Completed:   req.Completed,
 	})
 	if err != nil {
@@ -119,22 +119,22 @@ func (s *Store) Get(ctx context.Context, id int64) (Todo, bool, error) {
 // Red
 // Update applies a partial update to a todo and returns the persisted record.
 func (s *Store) Update(ctx context.Context, id int64, req UpdateTodoRequest) (Todo, bool, error) {
-	if req.Title == nil && req.Description == nil && req.Completed == nil {
+	if req.Title == nil && !req.Description.Set && req.Completed == nil {
 		return Todo{}, false, errors.New("at least one field must be provided")
 	}
 
 	params := db.UpdateTodoParams{
-		Completed: req.Completed,
-		ID:        id,
+		Completed:      req.Completed,
+		DescriptionSet: req.Description.Set,
+		ID:             id,
 	}
 	if req.Title != nil {
 		title := strings.TrimSpace(*req.Title)
 		params.Title = &title
 	}
 
-	if req.Description != nil {
-		description := strings.TrimSpace(*req.Description)
-		params.Description = &description
+	if req.Description.Set {
+		params.Description = trimNullableString(req.Description.Value)
 	}
 
 	record, err := s.queries.UpdateTodo(ctx, params)
@@ -147,37 +147,6 @@ func (s *Store) Update(ctx context.Context, id int64, req UpdateTodoRequest) (To
 
 	return fromDBTodo(record), true, nil
 }
-
-// Blue
-// Update applies a partial update to a todo and returns the persisted record.
-// func (s *Store) Update(ctx context.Context, id int64, req UpdateTodoRequest) (Todo, bool, error) {
-// 	if req.Title == nil && req.Description == nil && req.Completed == nil {
-// 		return Todo{}, false, errors.New("at least one field must be provided")
-// 	}
-
-// 	params := db.UpdateTodoParams{ID: id}
-// 	if req.Title != nil {
-// 		params.Title = pgtype.Text{String: strings.TrimSpace(*req.Title), Valid: true}
-// 	}
-
-// 	if req.Description != nil {
-// 		params.Description = pgtype.Text{String: strings.TrimSpace(*req.Description), Valid: true}
-// 	}
-
-// 	if req.Completed != nil {
-// 		params.Completed = pgtype.Bool{Bool: *req.Completed, Valid: true}
-// 	}
-
-// 	record, err := s.queries.UpdateTodo(ctx, params)
-// 	if err != nil {
-// 		if errors.Is(err, pgx.ErrNoRows) {
-// 			return Todo{}, false, nil
-// 		}
-// 		return Todo{}, false, fmt.Errorf("update todo: %w", err)
-// 	}
-
-// 	return fromDBTodo(record), true, nil
-// }
 
 // Delete removes a todo and reports whether a row was deleted.
 func (s *Store) Delete(ctx context.Context, id int64) (bool, error) {
@@ -198,4 +167,13 @@ func fromDBTodo(record db.Todo) Todo {
 		CreatedAt:   record.CreatedAt.Time,
 		UpdatedAt:   record.UpdatedAt.Time,
 	}
+}
+
+func trimNullableString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	return &trimmed
 }

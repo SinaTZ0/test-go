@@ -152,7 +152,7 @@ func (a *App) handleUpdateTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Title == nil && req.Description == nil && req.Completed == nil {
+	if req.Title == nil && !req.Description.Set && req.Completed == nil {
 		writeError(w, http.StatusBadRequest, "validation_error", "at least one field must be provided")
 		return
 	}
