@@ -34,21 +34,13 @@ SET
 WHERE id = sqlc.arg(id)
 RETURNING id, title, description, completed, created_at, updated_at;
 
--- name: UpdateTodoTitle :one
+-- name: UpdateTodo :one
 UPDATE todos
-SET title = sqlc.arg(title), updated_at = NOW()
-WHERE id = sqlc.arg(id)
-RETURNING id, title, description, completed, created_at, updated_at;
-
--- name: UpdateTodoDescription :one
-UPDATE todos
-SET description = sqlc.arg(description), updated_at = NOW()
-WHERE id = sqlc.arg(id)
-RETURNING id, title, description, completed, created_at, updated_at;
-
--- name: UpdateTodoCompleted :one
-UPDATE todos
-SET completed = sqlc.arg(completed), updated_at = NOW()
+SET
+	title = COALESCE(sqlc.narg(title), title),
+	description = COALESCE(sqlc.narg(description), description),
+	completed = COALESCE(sqlc.narg(completed), completed),
+	updated_at = NOW()
 WHERE id = sqlc.arg(id)
 RETURNING id, title, description, completed, created_at, updated_at;
 

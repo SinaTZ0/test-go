@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	// "github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTodo = `-- name: CreateTodo :one
@@ -149,20 +150,32 @@ func (q *Queries) ReplaceTodo(ctx context.Context, arg ReplaceTodoParams) (Todo,
 	return i, err
 }
 
-const updateTodoCompleted = `-- name: UpdateTodoCompleted :one
+// Red
+const updateTodo = `-- name: UpdateTodo :one
 UPDATE todos
-SET completed = $1, updated_at = NOW()
-WHERE id = $2
+SET
+	title = COALESCE($1, title),
+	description = COALESCE($2, description),
+	completed = COALESCE($3, completed),
+	updated_at = NOW()
+WHERE id = $4
 RETURNING id, title, description, completed, created_at, updated_at
 `
 
-type UpdateTodoCompletedParams struct {
-	Completed bool  `json:"completed"`
-	ID        int64 `json:"id"`
+type UpdateTodoParams struct {
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Completed   *bool   `json:"completed"`
+	ID          int64   `json:"id"`
 }
 
-func (q *Queries) UpdateTodoCompleted(ctx context.Context, arg UpdateTodoCompletedParams) (Todo, error) {
-	row := q.db.QueryRow(ctx, updateTodoCompleted, arg.Completed, arg.ID)
+func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, error) {
+	row := q.db.QueryRow(ctx, updateTodo,
+		arg.Title,
+		arg.Description,
+		arg.Completed,
+		arg.ID,
+	)
 	var i Todo
 	err := row.Scan(
 		&i.ID,
@@ -175,54 +188,40 @@ func (q *Queries) UpdateTodoCompleted(ctx context.Context, arg UpdateTodoComplet
 	return i, err
 }
 
-const updateTodoDescription = `-- name: UpdateTodoDescription :one
-UPDATE todos
-SET description = $1, updated_at = NOW()
-WHERE id = $2
-RETURNING id, title, description, completed, created_at, updated_at
-`
+// Blue
+// const updateTodo = `-- name: UpdateTodo :one
+// UPDATE todos
+// SET
+// 	title = COALESCE($1, title),
+// 	description = COALESCE($2, description),
+// 	completed = COALESCE($3, completed),
+// 	updated_at = NOW()
+// WHERE id = $4
+// RETURNING id, title, description, completed, created_at, updated_at
+// `
 
-type UpdateTodoDescriptionParams struct {
-	Description string `json:"description"`
-	ID          int64  `json:"id"`
-}
+// type UpdateTodoParams struct {
+// 	Title       pgtype.Text `json:"title"`
+// 	Description pgtype.Text `json:"description"`
+// 	Completed   pgtype.Bool `json:"completed"`
+// 	ID          int64       `json:"id"`
+// }
 
-func (q *Queries) UpdateTodoDescription(ctx context.Context, arg UpdateTodoDescriptionParams) (Todo, error) {
-	row := q.db.QueryRow(ctx, updateTodoDescription, arg.Description, arg.ID)
-	var i Todo
-	err := row.Scan(
-		&i.ID,
-		&i.Title,
-		&i.Description,
-		&i.Completed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const updateTodoTitle = `-- name: UpdateTodoTitle :one
-UPDATE todos
-SET title = $1, updated_at = NOW()
-WHERE id = $2
-RETURNING id, title, description, completed, created_at, updated_at
-`
-
-type UpdateTodoTitleParams struct {
-	Title string `json:"title"`
-	ID    int64  `json:"id"`
-}
-
-func (q *Queries) UpdateTodoTitle(ctx context.Context, arg UpdateTodoTitleParams) (Todo, error) {
-	row := q.db.QueryRow(ctx, updateTodoTitle, arg.Title, arg.ID)
-	var i Todo
-	err := row.Scan(
-		&i.ID,
-		&i.Title,
-		&i.Description,
-		&i.Completed,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
+// func (q *Queries) UpdateTodo(ctx context.Context, arg UpdateTodoParams) (Todo, error) {
+// 	row := q.db.QueryRow(ctx, updateTodo,
+// 		arg.Title,
+// 		arg.Description,
+// 		arg.Completed,
+// 		arg.ID,
+// 	)
+// 	var i Todo
+// 	err := row.Scan(
+// 		&i.ID,
+// 		&i.Title,
+// 		&i.Description,
+// 		&i.Completed,
+// 		&i.CreatedAt,
+// 		&i.UpdatedAt,
+// 	)
+// 	return i, err
+// }

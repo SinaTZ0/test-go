@@ -88,7 +88,7 @@ func TestTodoAPI(t *testing.T) {
 		}
 
 		updateRec := httptest.NewRecorder()
-		updateReq := httptest.NewRequest(http.MethodPatch, "/todos/1", bytes.NewBufferString(`{"completed":true}`))
+		updateReq := httptest.NewRequest(http.MethodPatch, "/todos/1", bytes.NewBufferString(`{"title":"Ship docs v2","description":"Published and verified","completed":false}`))
 		updateReq.Header.Set("Content-Type", "application/json")
 		app.ServeHTTP(updateRec, updateReq)
 		if updateRec.Code != http.StatusOK {
@@ -97,8 +97,8 @@ func TestTodoAPI(t *testing.T) {
 
 		var updated Todo
 		decodeBody(t, updateRec.Body.Bytes(), &updated)
-		if !updated.Completed {
-			t.Fatal("expected completed todo after patch")
+		if updated.Title != "Ship docs v2" || updated.Description != "Published and verified" || updated.Completed {
+			t.Fatalf("unexpected patched todo: %+v", updated)
 		}
 
 		deleteRec := httptest.NewRecorder()

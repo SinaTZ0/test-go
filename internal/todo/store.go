@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/SinaTZ0/test-go/internal/todo/db"
@@ -117,70 +116,68 @@ func (s *Store) Get(ctx context.Context, id int64) (Todo, bool, error) {
 	return fromDBTodo(record), true, nil
 }
 
+// Red
 // Update applies a partial update to a todo and returns the persisted record.
 func (s *Store) Update(ctx context.Context, id int64, req UpdateTodoRequest) (Todo, bool, error) {
 	if req.Title == nil && req.Description == nil && req.Completed == nil {
 		return Todo{}, false, errors.New("at least one field must be provided")
 	}
 
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return Todo{}, false, fmt.Errorf("begin update todo transaction: %w", err)
+	params := db.UpdateTodoParams{
+		Completed: req.Completed,
+		ID:        id,
 	}
-	defer func() {
-		if err := tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			log.Printf("rollback update todo transaction: %v", err)
-		}
-	}()
-
-	queries := s.queries.WithTx(tx)
-	var record db.Todo
-
 	if req.Title != nil {
-		record, err = queries.UpdateTodoTitle(ctx, db.UpdateTodoTitleParams{
-			ID:    id,
-			Title: strings.TrimSpace(*req.Title),
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return Todo{}, false, nil
-			}
-			return Todo{}, false, fmt.Errorf("update todo title: %w", err)
-		}
+		title := strings.TrimSpace(*req.Title)
+		params.Title = &title
 	}
 
 	if req.Description != nil {
-		record, err = queries.UpdateTodoDescription(ctx, db.UpdateTodoDescriptionParams{
-			ID:          id,
-			Description: strings.TrimSpace(*req.Description),
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return Todo{}, false, nil
-			}
-			return Todo{}, false, fmt.Errorf("update todo description: %w", err)
-		}
+		description := strings.TrimSpace(*req.Description)
+		params.Description = &description
 	}
 
-	if req.Completed != nil {
-		record, err = queries.UpdateTodoCompleted(ctx, db.UpdateTodoCompletedParams{
-			ID:        id,
-			Completed: *req.Completed,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return Todo{}, false, nil
-			}
-			return Todo{}, false, fmt.Errorf("update todo completed: %w", err)
+	record, err := s.queries.UpdateTodo(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Todo{}, false, nil
 		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return Todo{}, false, fmt.Errorf("commit update todo transaction: %w", err)
+		return Todo{}, false, fmt.Errorf("update todo: %w", err)
 	}
 
 	return fromDBTodo(record), true, nil
 }
+
+// Blue
+// Update applies a partial update to a todo and returns the persisted record.
+// func (s *Store) Update(ctx context.Context, id int64, req UpdateTodoRequest) (Todo, bool, error) {
+// 	if req.Title == nil && req.Description == nil && req.Completed == nil {
+// 		return Todo{}, false, errors.New("at least one field must be provided")
+// 	}
+
+// 	params := db.UpdateTodoParams{ID: id}
+// 	if req.Title != nil {
+// 		params.Title = pgtype.Text{String: strings.TrimSpace(*req.Title), Valid: true}
+// 	}
+
+// 	if req.Description != nil {
+// 		params.Description = pgtype.Text{String: strings.TrimSpace(*req.Description), Valid: true}
+// 	}
+
+// 	if req.Completed != nil {
+// 		params.Completed = pgtype.Bool{Bool: *req.Completed, Valid: true}
+// 	}
+
+// 	record, err := s.queries.UpdateTodo(ctx, params)
+// 	if err != nil {
+// 		if errors.Is(err, pgx.ErrNoRows) {
+// 			return Todo{}, false, nil
+// 		}
+// 		return Todo{}, false, fmt.Errorf("update todo: %w", err)
+// 	}
+
+// 	return fromDBTodo(record), true, nil
+// }
 
 // Delete removes a todo and reports whether a row was deleted.
 func (s *Store) Delete(ctx context.Context, id int64) (bool, error) {
